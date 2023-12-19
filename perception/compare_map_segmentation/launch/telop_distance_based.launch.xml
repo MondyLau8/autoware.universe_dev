@@ -1,0 +1,32 @@
+<launch>
+  <arg name="input" default="/input" description="input topic name"/>
+  <arg name="input_map" default="/map" description="input map topic name"/>
+  <arg name="output" default="/output" description="output topic name"/>
+  <arg name="distance_threshold" default="10.0" description="distance threshold for map segmentation"/>
+  <arg name="use_dynamic_map_loading" default="false" description="use dynamic map loading"/>
+  <arg name="publish_debug_pcd" default="false" description="publish debug point cloud data"/>
+  <arg name="timer_interval_ms" default="100"/>
+  <arg name="map_update_distance_threshold" default="10.0"/>
+  <arg name="map_loader_radius" default="150.0"/>
+  <arg name="approximate_sync" default="false" description="approximate synchronization"/>
+  <arg name="use_indices" default="false" description="use indices"/>
+  <arg name="latched_indices" default="false" description="latched indices"/>
+  <arg name="max_queue_size" default="5" description="maximum queue size"/>
+
+
+  <node pkg="compare_map_segmentation" exec="distance_based_compare_map_filter_node" name="distance_based_compare_map_filter_node" output="screen">
+    <remap from="input" to="$(var input)"/>
+    <remap from="map" to="$(var input_map)"/>
+    <remap from="output" to="$(var output)"/>
+    <param name="distance_threshold" value="$(var distance_threshold)"/>
+    <param name="use_dynamic_map_loading" value="$(var use_dynamic_map_loading)"/>
+    <param name="publish_debug_pcd" value="$(var publish_debug_pcd)"/>
+    <param name="timer_interval_ms" value="$(var timer_interval_ms)"/>
+    <param name="map_update_distance_threshold" value="$(var map_update_distance_threshold)"/>
+    <param name="map_loader_radius" value="$(var map_loader_radius)"/>
+    <param name="approximate_sync" value="$(var approximate_sync)"/>
+    <param name="use_indices" value="$(var use_indices)"/>
+    <param name="latched_indices" value="$(var latched_indices)"/>
+    <param name="max_queue_size" value="$(var max_queue_size)"/>
+  </node>
+</launch>
