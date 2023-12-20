@@ -27,6 +27,15 @@ include_directories(
   ${Boost_INCLUDE_DIRS}
 )
 
+# Create a library for utils
+set(UTILS_LIB
+  lib/utils.cpp
+)
+
+ament_auto_add_library(utils SHARED
+  ${UTILS_LIB}
+)
+
 # Generate occupancy grid based validator exe file
 set(OCCUPANCY_GRID_BASED_VALIDATOR_SRC
   src/occupancy_grid_based_validator.cpp
@@ -55,6 +64,14 @@ target_link_libraries(obstacle_pointcloud_based_validator
   Eigen3::Eigen
 )
 
+ament_auto_add_library(cluster_lanelet_filter SHARED
+  src/cluster_lanelet_filter.cpp
+  src/utils.cpp
+)
+target_link_libraries(cluster_lanelet_filter
+  utils
+)
+
 ament_auto_add_library(object_lanelet_filter SHARED
   src/object_lanelet_filter.cpp
   src/utils.cpp
@@ -68,6 +85,11 @@ ament_auto_add_library(object_position_filter SHARED
 rclcpp_components_register_node(obstacle_pointcloud_based_validator
   PLUGIN "obstacle_pointcloud_based_validator::ObstaclePointCloudBasedValidator"
   EXECUTABLE obstacle_pointcloud_based_validator_node
+)
+
+rclcpp_components_register_node(cluster_lanelet_filter
+  PLUGIN "cluster_lanelet_filter::ClusterLaneletFilterNode"
+  EXECUTABLE cluster_lanelet_filter_node
 )
 
 rclcpp_components_register_node(object_lanelet_filter
