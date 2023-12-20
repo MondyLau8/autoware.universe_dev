@@ -12,10 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef DETECTED_OBJECT_VALIDATION__UTILS__UTILS_HPP_
-#define DETECTED_OBJECT_VALIDATION__UTILS__UTILS_HPP_
+#ifndef UTILS__UTILS_HPP_
+#define UTILS__UTILS_HPP_
 
 #include <cstdint>
+
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <tier4_perception_msgs/msg/detected_objects_with_feature.hpp>
+
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
+
+#include <vector>
 
 namespace utils
 {
@@ -31,6 +41,10 @@ struct FilterTargetLabel
   bool PEDESTRIAN;
   bool isTarget(const uint8_t label) const;
 };  // struct FilterTargetLabel
+
+void convertObjectMsg2SensorMsg(
+  const tier4_perception_msgs::msg::DetectedObjectsWithFeature & input,
+  sensor_msgs::msg::PointCloud2 & output);
 }  // namespace utils
 
-#endif  // DETECTED_OBJECT_VALIDATION__UTILS__UTILS_HPP_
+#endif  // UTILS__UTILS_HPP_
