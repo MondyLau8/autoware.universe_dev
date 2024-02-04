@@ -32,6 +32,10 @@ def launch_setup(context, *args, **kwargs):
     vehicle_info_param_path = LaunchConfiguration("vehicle_info_param_file").perform(context)
     with open(vehicle_info_param_path, "r") as f:
         vehicle_info_param = yaml.safe_load(f)["/**"]["ros__parameters"]
+    # ground_segmentation_param_path = LaunchConfiguration("ground_segmentation_param_file").perform(context)
+    # with open(ground_segmentation_param_path, "r") as f:
+    #     ground_segmentation_param = yaml.safe_load(f)["/**"]["ros__parameters"]
+
 
     nodes = [
         ComposableNode(
@@ -50,6 +54,7 @@ def launch_setup(context, *args, **kwargs):
                     "split_height_distance": 0.2,
                 },
                 vehicle_info_param,
+                # ground_segmentation_param  # Add this line
             ],
         ),
     ]
@@ -93,6 +98,15 @@ def generate_launch_description():
         default_value=default_vehicle_info_param,
         description="Path to config file for vehicle information",
     )
+
+    # ground_segmentation_param = DeclareLaunchArgument(
+    # "ground_segmentation_param_file",
+    # default_value=os.path.join(
+    #     get_package_share_directory("your_package_name"), "config/ground_segmentation.param.yaml"
+    # ),
+    # description="Path to config file for ground segmentation",
+    # )
+
 
     return launch.LaunchDescription(
         [
