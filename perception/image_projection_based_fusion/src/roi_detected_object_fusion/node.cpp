@@ -19,6 +19,13 @@
 #include <image_projection_based_fusion/utils/geometry.hpp>
 #include <image_projection_based_fusion/utils/utils.hpp>
 
+#include <iostream> //!!!
+#include <vector> //!!!
+#include <map> //!!!
+#include <Eigen/Dense> //!!!
+
+#include <typeinfo>
+
 // cspell: ignore minx, maxx, miny, maxy, minz, maxz
 
 namespace image_projection_based_fusion
@@ -43,6 +50,12 @@ RoiDetectedObjectFusionNode::RoiDetectedObjectFusionNode(const rclcpp::NodeOptio
   }
 }
 
+// void printCameraProjection(const Eigen::Matrix4d &camera_projection) {
+//     std::cout << "Camera Projection Matrix:" << std::endl;
+//     std::cout << camera_projection << std::endl;
+// } // !!!TEMP
+
+
 void RoiDetectedObjectFusionNode::preprocess(DetectedObjects & output_msg)
 {
   std::vector<bool> passthrough_object_flags, fused_object_flags, ignored_object_flags;
@@ -51,16 +64,29 @@ void RoiDetectedObjectFusionNode::preprocess(DetectedObjects & output_msg)
   ignored_object_flags.resize(output_msg.objects.size());
   for (std::size_t obj_i = 0; obj_i < output_msg.objects.size(); ++obj_i) {
     const auto & object = output_msg.objects.at(obj_i);
+
+    // for (const auto& [label, probability] : output_msg.objects.at(obj_i).classification) {
+    //   std::cout << "111111111111111111111111111111111111111111111111111111111111111111111111objectLabel_preprocess: " << label << ", 11objectProbability_preprocess: " << probability << std::endl;
+    //   } //!!!TEMP
+
     const auto label = object_recognition_utils::getHighestProbLabel(object.classification);
+    // std::cout << "类型 of label: " << typeid(label).name() << std::endl;
+    // std::cout << "111rawlabel" << label << std::endl;
     const auto pos = object_recognition_utils::getPose(object).position;
     const auto object_sqr_dist = pos.x * pos.x + pos.y * pos.y;
     const auto prob_threshold =
       fusion_params_.passthrough_lower_bound_probability_thresholds.at(label);
+
+    std::cout << "111rawprob_threshold" << prob_threshold << " object.existence_probability: " << object.existence_probability << std::endl;
+
     const auto trust_sqr_dist =
       fusion_params_.trust_distances.at(label) * fusion_params_.trust_distances.at(label);
-    if (object.existence_probability > prob_threshold || object_sqr_dist > trust_sqr_dist) {
+    // const auto trust_sqr_dist_max =
+    //   fusion_params_.trust_distances_max.at(label) * fusion_params_.trust_distances_max.at(label);
+    std::cout << "object_sqr_dist" << object_sqr_dist << std::endl; //!!!TEMP
+    if (object.existence_probability > prob_threshold && object_sqr_dist < trust_sqr_dist) {
       passthrough_object_flags.at(obj_i) = true;
-    }
+    } // orignal: object_sqr_dist < trust_sqr_dist
   }
 
   int64_t timestamp_nsec =
@@ -86,6 +112,8 @@ void RoiDetectedObjectFusionNode::fuseOnSingleImage(
     }
     object2camera_affine = transformToEigen(transform_stamped_optional.value().transform);
   }
+
+  std::cout << "0111111111" << std::endl; //!!!TEMP
 
   Eigen::Matrix4d camera_projection;
   camera_projection << camera_info.p.at(0), camera_info.p.at(1), camera_info.p.at(2),
@@ -121,10 +149,19 @@ RoiDetectedObjectFusionNode::generateDetectedObjectRoIs(
   if (passthrough_object_flags_map_.count(timestamp_nsec) == 0) {
     return object_roi_map;
   }
+
+  std::cout << "passthrough_object_flags_map_.count(timestamp_nsec): " << passthrough_object_flags_map_.count(timestamp_nsec) << std::endl;
+
   const auto & passthrough_object_flags = passthrough_object_flags_map_.at(timestamp_nsec);
   for (std::size_t obj_i = 0; obj_i < input_object_msg.objects.size(); ++obj_i) {
     std::vector<Eigen::Vector3d> vertices_camera_coord;
     const auto & object = input_object_msg.objects.at(obj_i);
+    
+
+    std::cout << "passthrough_object_flags.at(obj_i): " << passthrough_object_flags.at(obj_i) << std::endl;
+    // for (const auto& [label, probability] : input_object_msg.objects.at(obj_i).classification) {
+    //   std::cout << "11objectLabel11raw11: " << label << ", 11objectProbability11raw11: " << probability << std::endl;
+    //   } //!!!TEMP
 
     if (passthrough_object_flags.at(obj_i)) {
       continue;
@@ -149,18 +186,34 @@ RoiDetectedObjectFusionNode::generateDetectedObjectRoIs(
         continue;
       }
 
+      // std::cout << " min.x: " << min_x << " min.y: " << min_y << " max_x" << max_x << " max_y" << max_y << std::endl; //!!!TEMP
+
       Eigen::Vector2d proj_point;
       {
+        // std::cout << " point.x: " << point.x() << " point.y: " << point.y() << " point.z: " << point.z()<< std::endl; //!!!TEMP
+        // printCameraProjection(camera_projection); //!!!TEMP
+        
         Eigen::Vector4d proj_point_hom =
           camera_projection * Eigen::Vector4d(point.x(), point.y(), point.z(), 1.0);
+
+        // std::cout << " proj_point_hom.x: " << proj_point_hom.x() << " proj_point_hom.Y: " << proj_point_hom.y() << " proj_point_hom.z: " << proj_point_hom.z() << std::endl; //!!!TEMP
+
         proj_point = Eigen::Vector2d(
           proj_point_hom.x() / (proj_point_hom.z()), proj_point_hom.y() / (proj_point_hom.z()));
+        
+        // std::cout << " proj_point.x: " << proj_point.x() << " proj_point.Y: " << proj_point.y() << std::endl; //!!!TEMP
+
       }
+
 
       min_x = std::min(proj_point.x(), min_x);
       min_y = std::min(proj_point.y(), min_y);
       max_x = std::max(proj_point.x(), max_x);
       max_y = std::max(proj_point.y(), max_y);
+
+
+      // std::cout << " proj_point.x: " << proj_point.x() << " proj_point.y: " << proj_point.y() << std::endl; //!!!TEMP
+      // std::cout << " image_width: " << image_width << " image_height: " << image_height << std::endl; //!!!TEMP
 
       if (
         proj_point.x() >= 0 && proj_point.x() <= image_width - 1 && proj_point.y() >= 0 &&
@@ -172,6 +225,9 @@ RoiDetectedObjectFusionNode::generateDetectedObjectRoIs(
         }
       }
     }
+
+    std::cout << "point_on_image_cnt: " << point_on_image_cnt << std::endl;
+
     if (point_on_image_cnt < 3) {
       continue;
     }
@@ -207,21 +263,31 @@ void RoiDetectedObjectFusionNode::fuseObjectsOnImage(
   int64_t timestamp_nsec =
     input_object_msg.header.stamp.sec * (int64_t)1e9 + input_object_msg.header.stamp.nanosec;
   if (fused_object_flags_map_.size() == 0 || ignored_object_flags_map_.size() == 0) {
+    std::cout << "1111111111" << std::endl; //!!!TEMP
     return;
   }
   if (
     fused_object_flags_map_.count(timestamp_nsec) == 0 ||
     ignored_object_flags_map_.count(timestamp_nsec) == 0) {
+    std::cout << "2111111111" << std::endl; //!!!TEMP
     return;
   }
+  std::cout << "3111111111" << std::endl; //!!!TEMP
   auto & fused_object_flags = fused_object_flags_map_.at(timestamp_nsec);
   auto & ignored_object_flags = ignored_object_flags_map_.at(timestamp_nsec);
 
+  // std::cout << "Size of object_roi_map: " << object_roi_map.size() << std::endl; //!!! TEMP
+
+
+
   for (const auto & object_pair : object_roi_map) {
     const auto & obj_i = object_pair.first;
+    
     if (fused_object_flags.at(obj_i)) {
       continue;
     }
+
+    std::cout << "4111111111" << std::endl; //!!!TEMP 
 
     float roi_prob = 0.0f;
     float max_iou = 0.0f;
@@ -231,16 +297,44 @@ void RoiDetectedObjectFusionNode::fuseObjectsOnImage(
         object_recognition_utils::getHighestProbLabel(object_roi.object.classification);
       const auto image_roi_label =
         object_recognition_utils::getHighestProbLabel(image_roi.object.classification);
-      if (!fusion_params_.can_assign_matrix(object_roi_label, image_roi_label)) {
+
+      // for (const auto& [label, probability] : object_roi.object.classification) {
+      //   std::cout << "objectLabel: " << label << ", objectProbability: " << probability << std::endl;
+      //   } //!!!TEMP
+      // for (const auto& [label, probability] : image_roi.object.classification) {
+      //   std::cout << "imageLabel: " << label << ", imageProbability: " << probability << std::endl;
+      //   } //!!!TEMP
+      // std::cout << "object_roi_label: " << object_roi_label << "  image_roi_label: " << image_roi_label << std::endl; //!!!TEMP
+
+      int object_label = static_cast<int>(object_roi_label);
+      int image_label = static_cast<int>(image_roi_label);
+      if (!fusion_params_.can_assign_matrix(object_label, image_label)) {
+        std::cout << "error5555: " << fusion_params_.can_assign_matrix(object_label, image_label) << "object_roi_label: " \
+        << object_label << "  image_roi_label: " << image_label << std::endl; //!!!TEMP
         continue;
-      }
+      }  // problem try!!!
+      // if (!fusion_params_.can_assign_matrix(object_roi_label, image_roi_label)) {
+      //   std::cout << "error5555: " << fusion_params_.can_assign_matrix(object_roi_label, image_roi_label) 
+      //   << "object_roi_label: " << object_roi_label << "  image_roi_label: " << image_roi_label << std::endl; //!!!TEMP
+      //   continue;
+      // }  // problem reason!!!
 
       const double iou = calcIoU(object_roi.feature.roi, image_roi.feature.roi);
+
+      std::cout << "object_roi_label: " << object_label << "  image_roi_label: " << image_label << std::endl; //!!!TEMP
+      std::cout << "x_lidar2d: " << object_roi.feature.roi.x_offset << " y_lidar2d: " << object_roi.feature.roi.y_offset \
+        << " w_lidar2d: " << object_roi.feature.roi.width << " h_lidar2d: " << object_roi.feature.roi.height << std::endl; //!!!TEMP
+      std::cout << " x_cam2d: " << image_roi.feature.roi.x_offset << " y_cam2d: " << image_roi.feature.roi.y_offset \
+        << " w_cam2d: " << image_roi.feature.roi.width << " h_cam2d: " << image_roi.feature.roi.height << std::endl; //!!!TEMP
+      std::cout << "iou" << iou << "max_iou" << max_iou << std::endl; //!!!TEMP
+
       if (iou > max_iou) {
         max_iou = iou;
         roi_prob = image_roi.object.existence_probability;
       }
     }
+
+    // std::cout << "max_iou" << max_iou << "fusion_params_.min_iou_threshold" << fusion_params_.min_iou_threshold << std::endl; //!!!TEMP
 
     if (max_iou > fusion_params_.min_iou_threshold) {
       if (fusion_params_.use_roi_probability) {
@@ -283,15 +377,18 @@ bool RoiDetectedObjectFusionNode::out_of_scope(const DetectedObject & obj)
 
 void RoiDetectedObjectFusionNode::publish(const DetectedObjects & output_msg)
 {
-  if (pub_ptr_->get_subscription_count() < 1) {
-    return;
-  }
+
+  // if (pub_ptr_->get_subscription_count() < 1) {
+  //   return;
+  // }
 
   int64_t timestamp_nsec =
     output_msg.header.stamp.sec * (int64_t)1e9 + output_msg.header.stamp.nanosec;
   if (
     passthrough_object_flags_map_.size() == 0 || fused_object_flags_map_.size() == 0 ||
     ignored_object_flags_map_.size() == 0) {
+    std::cout << passthrough_object_flags_map_.size() << "000" << fused_object_flags_map_.size() << "000" \
+    << ignored_object_flags_map_.size() << std::endl; //!!!TEMP
     return;
   }
   if (
@@ -304,6 +401,35 @@ void RoiDetectedObjectFusionNode::publish(const DetectedObjects & output_msg)
   auto & fused_object_flags = fused_object_flags_map_.at(timestamp_nsec);
   auto & ignored_object_flags = ignored_object_flags_map_.at(timestamp_nsec);
 
+  //!!!TEMP Print the map
+  std::cout << "passthrough_object_flags_map_: " << std::endl;
+  for (const auto& pair : passthrough_object_flags_map_) {
+      std::cout << "Timestamp: " << pair.first << " | Flags: ";
+      for (bool flag : pair.second) {
+          std::cout << flag << " ";
+      }
+      std::cout << std::endl;
+  }
+  //!!!TEMP Print the map
+  std::cout << "fused_object_flags_map_: " << std::endl;
+  for (const auto& pair : fused_object_flags_map_) {
+      std::cout << "Timestamp: " << pair.first << " | Flags: ";
+      for (bool flag : pair.second) {
+          std::cout << flag << " ";
+      }
+      std::cout << std::endl;
+  }
+  //!!!TEMP Print the map
+  std::cout << "ignored_object_flags_map_: " << std::endl;
+  for (const auto& pair : ignored_object_flags_map_) {
+      std::cout << "Timestamp: " << pair.first << " | Flags: ";
+      for (bool flag : pair.second) {
+          std::cout << flag << " ";
+      }
+      std::cout << std::endl;
+  }
+
+
   DetectedObjects output_objects_msg, debug_fused_objects_msg, debug_ignored_objects_msg;
   output_objects_msg.header = output_msg.header;
   debug_fused_objects_msg.header = output_msg.header;
@@ -311,13 +437,16 @@ void RoiDetectedObjectFusionNode::publish(const DetectedObjects & output_msg)
   for (std::size_t obj_i = 0; obj_i < output_msg.objects.size(); ++obj_i) {
     const auto & obj = output_msg.objects.at(obj_i);
     if (passthrough_object_flags.at(obj_i)) {
+      // std::cout << "Passthrough Object: " << obj_i<< std::endl; //!!!TEMP
       output_objects_msg.objects.emplace_back(obj);
     }
     if (fused_object_flags.at(obj_i)) {
+      // std::cout << "fused_object: " << obj_i<< std::endl; //!!!TEMP
       output_objects_msg.objects.emplace_back(obj);
       debug_fused_objects_msg.objects.emplace_back(obj);
     }
     if (ignored_object_flags.at(obj_i)) {
+      // std::cout << "ignored_object: " << obj_i<< std::endl; //!!!TEMP
       debug_ignored_objects_msg.objects.emplace_back(obj);
     }
   }
