@@ -19,6 +19,8 @@
 
 #include <unordered_map>
 
+#include <iostream>
+
 namespace euclidean_cluster
 {
 VoxelGridBasedEuclideanCluster::VoxelGridBasedEuclideanCluster()
@@ -41,6 +43,21 @@ VoxelGridBasedEuclideanCluster::VoxelGridBasedEuclideanCluster(
 {
 }
 
+// Modified constructor with new parameters
+VoxelGridBasedEuclideanCluster::VoxelGridBasedEuclideanCluster(
+  bool use_height, int min_cluster_size, int max_cluster_size, float tolerance,
+  float voxel_leaf_size, int min_points_number_per_voxel,
+  float max_x, float min_x, float max_y, float min_y, float max_z, float min_z)
+: EuclideanClusterInterface(use_height, min_cluster_size, max_cluster_size),
+  tolerance_(tolerance),
+  voxel_leaf_size_(voxel_leaf_size),
+  min_points_number_per_voxel_(min_points_number_per_voxel),
+  max_x_(max_x), min_x_(min_x),
+  max_y_(max_y), min_y_(min_y),
+  max_z_(max_z), min_z_(min_z)
+{
+}
+
 bool VoxelGridBasedEuclideanCluster::cluster(
   const pcl::PointCloud<pcl::PointXYZ>::ConstPtr & pointcloud,
   std::vector<pcl::PointCloud<pcl::PointXYZ>> & clusters)
@@ -54,6 +71,9 @@ bool VoxelGridBasedEuclideanCluster::cluster(
   voxel_grid_.setInputCloud(pointcloud);
   voxel_grid_.setSaveLeafLayout(true);
   voxel_grid_.filter(*voxel_map_ptr);
+
+
+  std::cout << "voxel_leaf_size_: " << voxel_leaf_size_ << std::endl;
 
   // voxel is pressed 2d
   pcl::PointCloud<pcl::PointXYZ>::Ptr pointcloud_2d_ptr(new pcl::PointCloud<pcl::PointXYZ>);
@@ -102,8 +122,41 @@ bool VoxelGridBasedEuclideanCluster::cluster(
   // build output and check cluster size
   {
     for (const auto & cluster : temporary_clusters) {
+      // Calculate the centroid of the cluster
+      float centroid_x = 0.0, centroid_y = 0.0, centroid_z = 0.0;
+      for (const auto & point : cluster.points) {
+        centroid_x += point.x;
+        centroid_y += point.y;
+        centroid_z += point.z;
+      }
+      centroid_x /= cluster.points.size();
+      centroid_y /= cluster.points.size();
+      centroid_z /= cluster.points.size();
+
+
+      // Check if the centroid is within the specified range
+      if (!(min_x_ <= centroid_x && centroid_x <= max_x_ &&
+            min_y_ <= centroid_y && centroid_y <= max_y_ &&
+            min_z_ <= centroid_z && centroid_z <= max_z_)) {
+        // std::cout << "Debug Info: " << std::endl;
+        // std::cout << "min_x_: " << min_x_ << ", centroid_x: " << centroid_x << ", max_x_: " << max_x_ << std::endl;
+        // std::cout << "min_y_: " << min_y_ << ", centroid_y: " << centroid_y << ", max_y_: " << max_y_ << std::endl;
+        // std::cout << "min_z_: " << min_z_ << ", centroid_z: " << centroid_z << ", max_z_: " << max_z_ << std::endl;
+        // std::cout << "Failing conditions: " << std::endl;
+        // std::cout << "(min_x_ <= centroid_x): " << (min_x_ <= centroid_x) << std::endl;
+        // std::cout << "(centroid_x <= max_x_): " << (centroid_x <= max_x_) << std::endl;
+        // std::cout << "(min_y_ <= centroid_y): " << (min_y_ <= centroid_y) << std::endl;
+        // std::cout << "(centroid_y <= max_y_): " << (centroid_y <= max_y_) << std::endl;
+        // std::cout << "(min_z_ <= centroid_z): " << (min_z_ <= centroid_z) << std::endl;
+        // std::cout << "(centroid_z <= max_z_): " << (centroid_z <= max_z_) << std::endl;
+        continue;
+      }
       if (!(min_cluster_size_ <= static_cast<int>(cluster.points.size()) &&
             static_cast<int>(cluster.points.size()) <= max_cluster_size_)) {
+        
+        std::cout << "min_cluster_size_ !!!!!!!!: " << min_cluster_size_ << std::endl;
+        std::cout << "static_cast<int>(cluster.points.size()): " << static_cast<int>(cluster.points.size()) << std::endl;
+        std::cout << "max_cluster_size_: " << max_cluster_size_ << std::endl;
         continue;
       }
       clusters.push_back(cluster);
